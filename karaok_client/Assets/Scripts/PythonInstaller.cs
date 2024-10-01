@@ -11,20 +11,20 @@ public class PythonInstaller : ProcessRunnerBase
     private readonly HttpClient client = new HttpClient();
 
     // Public method to initiate the Python installation process
-    public override async Task<ProcessResult> RunProcess<T>(string scriptPath, string args)
+    public override async Task<ProcessResult<T>> RunProcess<T>(string scriptPath, string args)
     {
-        return await StartInstallationProcess();
+        return await StartInstallationProcess<T>();
     }
 
     // Private method to start the installation process
-    private async Task<ProcessResult> StartInstallationProcess()
+    private async Task<ProcessResult<T>> StartInstallationProcess<T>()
     {
-        ProcessResult urlResult = await GetLatestPythonVersionUrl();
+        ProcessResult<T> urlResult = await GetLatestPythonVersionUrl<T>();
 
         if (urlResult.Success && !string.IsNullOrEmpty(urlResult.Output))
         {
             // Proceed to download and install Python
-            return await DownloadAndInstallPython(urlResult.Output);
+            return await DownloadAndInstallPython<T>(urlResult.Output);
         }
         else
         {
@@ -32,12 +32,12 @@ public class PythonInstaller : ProcessRunnerBase
             Log($"Download Python manually from: {browserUrl}");
             Application.OpenURL(browserUrl);
             LogError("Failed to fetch the latest Python installer URL.");
-            return new ProcessResult(null, "Failed to fetch the Python installer URL", -1);
+            return new ProcessResult<T>(null, "Failed to fetch the Python installer URL", -1);
         }
     }
 
     // Fetch the latest Python installer URL
-    private async Task<ProcessResult> GetLatestPythonVersionUrl()
+    private async Task<ProcessResult<T>> GetLatestPythonVersionUrl<T>()
     {
         string latestPythonApiUrl = "https://www.python.org/api/v2/downloads/release/?is_published=true&limit=1";
 
@@ -56,25 +56,25 @@ public class PythonInstaller : ProcessRunnerBase
             if (Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
             {
                 Log($"Latest Windows Installer: {windowsUrl}");
-                return new ProcessResult(windowsUrl, null, 0);
+                return new ProcessResult<T>(windowsUrl, null, 0);
             }
             if (Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.OSXEditor)
             {
                 Log($"Latest macOS Installer: {macosUrl}");
-                return new ProcessResult(macosUrl, null, 0);
+                return new ProcessResult<T>(macosUrl, null, 0);
             }
         }
         catch (Exception ex)
         {
             LogError($"Failed to fetch the latest Python version: {ex.Message}");
-            return new ProcessResult(null, $"Error fetching Python URL: {ex.Message}", -1);
+            return new ProcessResult<T>(null, $"Error fetching Python URL: {ex.Message}", -1);
         }
 
-        return new ProcessResult(null, "Unsupported platform or no URL found", -1);
+        return new ProcessResult<T>(null, "Unsupported platform or no URL found", -1);
     }
 
     // Download the Python installer and trigger installation
-    private async Task<ProcessResult> DownloadAndInstallPython(string installerUrl)
+    private async Task<ProcessResult<T>> DownloadAndInstallPython<T>(string installerUrl)
     {
         try
         {
@@ -93,24 +93,24 @@ public class PythonInstaller : ProcessRunnerBase
 
             if (Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
             {
-                return InstallOnWindows(tempPath);
+                return InstallOnWindows<T>(tempPath);
             }
             else if (Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.OSXEditor)
             {
-                return InstallOnMacOS(tempPath);
+                return InstallOnMacOS<T>(tempPath);
             }
         }
         catch (Exception ex)
         {
             LogError($"Error during download and installation: {ex.Message}");
-            return new ProcessResult(null, $"Error downloading installer: {ex.Message}", -1);
+            return new ProcessResult<T>(null, $"Error downloading installer: {ex.Message}", -1);
         }
 
-        return new ProcessResult(null, "Platform not supported for installation", -1);
+        return new ProcessResult<T>(null, "Platform not supported for installation", -1);
     }
 
     // Trigger installation on Windows
-    private ProcessResult InstallOnWindows(string installerPath)
+    private ProcessResult<T> InstallOnWindows<T>(string installerPath)
     {
         try
         {
@@ -129,23 +129,23 @@ public class PythonInstaller : ProcessRunnerBase
             if (process.ExitCode == 0)
             {
                 Log("Python installation completed successfully on Windows.");
-                return new ProcessResult("Python installed successfully", null, 0);
+                return new ProcessResult<T>("Python installed successfully", null, 0);
             }
             else
             {
                 LogError($"Python installation failed on Windows with exit code: {process.ExitCode}");
-                return new ProcessResult(null, $"Installation failed with exit code: {process.ExitCode}", process.ExitCode);
+                return new ProcessResult<T>(null, $"Installation failed with exit code: {process.ExitCode}", process.ExitCode);
             }
         }
         catch (Exception ex)
         {
             LogError($"Failed to start Python installation on Windows: {ex.Message}");
-            return new ProcessResult(null, $"Error during Windows installation: {ex.Message}", -1);
+            return new ProcessResult<T>(null, $"Error during Windows installation: {ex.Message}", -1);
         }
     }
 
     // Trigger installation on macOS
-    private ProcessResult InstallOnMacOS(string installerPath)
+    private ProcessResult<T> InstallOnMacOS<T>(string installerPath)
     {
         try
         {
@@ -164,18 +164,18 @@ public class PythonInstaller : ProcessRunnerBase
             if (process.ExitCode == 0)
             {
                 Log("Python installation completed successfully on macOS.");
-                return new ProcessResult("Python installed successfully", null, 0);
+                return new ProcessResult<T>("Python installed successfully", null, 0);
             }
             else
             {
                 LogError($"Python installation failed on macOS with exit code: {process.ExitCode}");
-                return new ProcessResult(null, $"Installation failed with exit code: {process.ExitCode}", process.ExitCode);
+                return new ProcessResult<T>(null, $"Installation failed with exit code: {process.ExitCode}", process.ExitCode);
             }
         }
         catch (Exception ex)
         {
             LogError($"Failed to start Python installation on macOS: {ex.Message}");
-            return new ProcessResult(null, $"Error during macOS installation: {ex.Message}", -1);
+            return new ProcessResult<T>(null, $"Error during macOS installation: {ex.Message}", -1);
         }
     }
 }

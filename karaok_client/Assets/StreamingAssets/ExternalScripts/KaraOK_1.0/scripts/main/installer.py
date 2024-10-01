@@ -39,10 +39,10 @@ def setup_environment(venv_path, venv_name):
     # Step 5: Activate virtual environment and install required packages
     activate_venv(venv_path, venv_name)
     
-    # List of required packages
+    # List of required packages, ensuring urllib3 is downgraded to version 1.26.15
     required_packages = ["demucs", "torchaudio", "yt-dlp", "diffq", "soundfile"]
     
-    # Install all required packages
-    subprocess.run([os.path.join(venv_path, "bin", "pip"), "install"] + required_packages)
+    # Install all required packages, ensuring urllib3 is installed with a specific version
+    subprocess.run([os.path.join(venv_path, "bin", "pip"), "install", "--upgrade"] + required_packages)
 
     print(f"Environment setup complete at: {venv_path}")

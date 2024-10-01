@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -9,9 +8,10 @@ using Debug = UnityEngine.Debug;
 public class PythonRunner : ProcessRunnerBase
 {
     const string PYTHON_SCRIPTS_ROOT = "ExternalScripts/KaraOK_1.0/scripts";
+    const string RETURN_VALUE_PREFIX = "Return Value: ";
 
     // Override the abstract method to run a Python script with optional arguments
-    public override async Task<ProcessResult> RunProcess<T>(string relativeScriptPath, string arguments = "")
+    public override async Task<ProcessResult<T>> RunProcess<T>(string relativeScriptPath, string arguments = "")
     {
         string pythonPath = Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor ? "python" : "python3";
 
@@ -21,14 +21,14 @@ public class PythonRunner : ProcessRunnerBase
         if (!File.Exists(scriptPath))
         {
             LogError($"Python script not found at: {scriptPath}");
-            return new ProcessResult(null, "Python script not found", -1);
+            return new ProcessResult<T>(null, "Python script not found", -1);
         }
 
         // Append the provided arguments to the Python script command
         ProcessStartInfo processStartInfo = new ProcessStartInfo
         {
             FileName = pythonPath,
-            Arguments = $"\"{scriptPath}\" {arguments}", // Pass the script and arguments
+            Arguments = $"\"{scriptPath}\" {arguments}",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -36,24 +36,28 @@ public class PythonRunner : ProcessRunnerBase
         };
 
         Process process = new Process { StartInfo = processStartInfo };
-        Log($"Python Output: {process.StartInfo.Arguments}");
-        ProcessResult res = new ProcessResult();
+        Log($"Command: {process.StartInfo.Arguments}");
+        ProcessResult<T> res = new ProcessResult<T>();
+
         try
         {
             process.OutputDataReceived += (sender, args) =>
             {
                 if (args.Data != null)
                 {
-                    if (typeof(T) != typeof(string))
+                    // Check if the data starts with the return value prefix
+                    if (args.Data.StartsWith(RETURN_VALUE_PREFIX))
                     {
+                        // Remove the prefix and attempt to deserialize the remaining data into type T
+                        var stringVal = args.Data.Replace(RETURN_VALUE_PREFIX, string.Empty);
                         try
                         {
-                            var val = (T)Convert.ChangeType(args.Data.ToLower(), typeof(T));
+                            var val = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(stringVal);
                             res.Value = val;
                         }
-                        catch (Exception e)
+                        catch (Exception ex)
                         {
-                            Debug.LogWarning($"[PythonRunner] - can't convert data ({args.Data}) to T({typeof(T)})");
+                            Debug.LogWarning($"[PythonRunner] - Failed to deserialize data to {typeof(T)}: {ex.Message}");
                         }
                     }
 
@@ -84,13 +88,12 @@ public class PythonRunner : ProcessRunnerBase
             int exitCode = process.ExitCode;
             res.ExitCode = exitCode;
             Log($"Python Output: {exitCode}");
-            //res.Output += "Process completed.";
             return res;
         }
         catch (System.Exception ex)
         {
             LogError($"Error running Python script: {ex.Message}");
-            return new ProcessResult(null, ex.Message, -1);
+            return new ProcessResult<T>(null, ex.Message, -1);
         }
     }
 }

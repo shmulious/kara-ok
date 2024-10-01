@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.IO;
 using UI;
+using TMPro;
 
 public class MainSceneView : MonoBehaviour
 {
@@ -15,6 +16,7 @@ public class MainSceneView : MonoBehaviour
     [SerializeField] private Button _demoButton;
     [SerializeField] private Button _processListButton;
     [SerializeField] private URLItemsListView _listHolder;
+    [SerializeField] private TMP_Dropdown _modelDropdown;
 
     private PythonInstaller _pythonInstaller;
     private PythonRunner _pythonRunner;
@@ -37,12 +39,12 @@ public class MainSceneView : MonoBehaviour
         RegisterButtonAction(_demoButton, RunDemo);
         RegisterButtonAction(_processListButton, ProcessList);
 
-        var res1 = await _pythonRunner.RunProcess<string>("main/smule.py", $"--init '{ProcessRunnerBase.ENV_PATH}'");
+        var res1 = await _pythonRunner.RunProcess<string>("main/smule.py", $"--init \"{ProcessRunnerBase.ENV_PATH}\"");
         Debug.Log($"[MainSceneView] - smule.py init result: {res1.Output}");
 
         var envExistsRes = await _pythonRunner.RunProcess<bool>("main/smule.py", "--environmentExists");
-        var envExistsValid = envExistsRes.TryGetValues<bool>(out var possibleVals);
-        var envExists = possibleVals.FirstOrDefault() && envExistsValid;
+        var envExistsValid = envExistsRes.Value;
+        var envExists = envExistsRes.Success;// && envExistsValid;
         Debug.Log($"[MainSceneView] - Environment exists: {envExists}");
 
         var isFfmpegInstalled = FFmpegInstaller.IsFFmpegInstalled();
@@ -88,22 +90,18 @@ public class MainSceneView : MonoBehaviour
         {
             Debug.LogWarning($"[MainSceneView] - No task found for button: {button.name}");
         }
-
-        button.interactable = true;
     }
 
     private async Task ProcessList()
     {
         Debug.Log("[MainSceneView] - ProcessList method started");
 
-        var youtubeUrls = _listHolder._listItems.Select(ipf => ipf.GetText());
-
+        var youtubeUrls = _listHolder._listItems;
+        var modelNumber = _modelDropdown.value + 1;
+        var outputFolderPath = Path.Combine(ProcessRunnerBase.ENV_PATH, "output");
         foreach (var item in youtubeUrls)
         {
-            Debug.Log($"[MainSceneView] - Processing URL: {item}");
-            var res = await _pythonRunner.RunProcess<string>("main/smule.py", $"--convert '{item}' '{Path.Combine(ProcessRunnerBase.ENV_PATH, "output")}' 2");
-            Debug.Log($"[MainSceneView] - Finished processing {item}");
-            Debug.Log($"[MainSceneView] - Result: {JsonConvert.SerializeObject(res)}");
+            var t = await item.Process(outputFolderPath, modelNumber);
         }
     }
 
@@ -120,6 +118,7 @@ public class MainSceneView : MonoBehaviour
         var res = await _pythonRunner.RunProcess<string>("main/smule.py", "--install");
         Debug.Log($"[MainSceneView] - Environment Install Result: {res.Output}");
         _demoButton.interactable = res.Success;
+        _processListButton.interactable = res.Success;
     }
 
     private async Task InstallPython()

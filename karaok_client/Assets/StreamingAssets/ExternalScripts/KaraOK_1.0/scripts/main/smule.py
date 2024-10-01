@@ -10,7 +10,6 @@ from scripts.main.installer import setup_environment
 from scripts.main.config_manager import set_to_config, get_from_config
 from scripts.main.environment import activate_venv, check_environment, ensure_virtual_env
 
-
 VENV_NAME = "smule-env"
 
 def log_environment_details(venv_path):
@@ -27,8 +26,10 @@ def init_action(containing_folder_path):
     """
     Initialize the environment, install ffmpeg, and save paths in config.
     """
-    containing_folder_path = os.path.expanduser(containing_folder_path)
+    # containing_folder_path = os.path.expanduser(containing_folder_path)
+    print(f"[Init] - containing_folder_path is {containing_folder_path}")
     venv_path = os.path.join(containing_folder_path, "venvs", VENV_NAME)
+    print(f"[Init] - venv_path is {venv_path}")
     
     # Install FFmpeg
     ffmpeg_path = os.path.join(containing_folder_path, "ffmpeg", "ffmpeg")
@@ -37,8 +38,6 @@ def init_action(containing_folder_path):
     set_to_config('venv_path', venv_path)
     set_to_config('ffmpeg_path', ffmpeg_path)
     set_to_config('containing_folder_path', containing_folder_path)
-
-    print(f"Initialization complete. FFmpeg installed at: {ffmpeg_path}")
 
 def environment_exists():
     """
@@ -49,7 +48,7 @@ def environment_exists():
     
     if not venv_path:
         return False
-    
+
     if sys.platform == "win32":
         activate_script = os.path.join(venv_path, "Scripts", "activate.bat")
     else:
@@ -59,7 +58,7 @@ def environment_exists():
 
 def main():
     parser = argparse.ArgumentParser(description="Smule CLI for YouTube conversion and processing")
-
+     
     # Command options
     parser.add_argument('--init', nargs=1, metavar=('containing_folder_path'), help="Initialize and set up environment with the given folder path")
     parser.add_argument('--install', action='store_true', help="Create or overwrite the virtual environment and install necessary packages")
@@ -68,19 +67,21 @@ def main():
     parser.add_argument('--version', action='store_true', help="Check if the environment is installed")
     parser.add_argument('--demo', action='store_true', help="Run the process with hardcoded demo arguments")
     parser.add_argument('--environmentExists', action='store_true', help="Check if the environment exists")
+    parser.add_argument('--getmetadata', nargs=1, metavar=('youtube_url'), help="Retrieve metadata (artist and song name) from the given YouTube URL")
 
     args = parser.parse_args()
 
     # Handle the --init action
     if args.init:
+        from error_handler import setup_global_error_handling
+        setup_global_error_handling()
         init_action(args.init[0])
-        return
+        sys.exit(0)
 
     # Handle the --environmentExists action
     if args.environmentExists:
         env_exists = environment_exists()
-        print(env_exists)  # Print True or False based on the result
-        return env_exists
+        sys.exit(0 if env_exists else 1)  # Exit with 0 if True, 1 if False
 
     # Load venv_path from config
     venv_path = get_from_config('venv_path')
@@ -90,13 +91,21 @@ def main():
         exit(1)
 
     if args.install:
-        log_environment_details(venv_path)
+        #log_environment_details(venv_path)
         setup_environment(venv_path, VENV_NAME)
+        exit(0)
 
     else:
         # Activate and ensure the environment is being used
         activate_venv(venv_path, VENV_NAME)
         ensure_virtual_env(venv_path)
+        
+        if args.getmetadata:
+            from scripts.functional.metadata_provider import get_song_metadata
+            youtube_url = args.getmetadata[0]
+            artist, title, thumbnail = get_song_metadata(youtube_url)
+            print(f"Artist: {artist}, Title: {title}, Thumbnail: {thumbnail}")
+            sys.exit(0)
 
         if args.convert:
             log_environment_details(venv_path)
@@ -106,6 +115,7 @@ def main():
 
                 from scripts.main.converter import convert
                 convert(youtube_url, output_folder, model)
+                exit(0)
             else:
                 print(f"Error: Environment '{VENV_NAME}' is not installed. Run 'smule.py --install' first.")
                 exit(1)

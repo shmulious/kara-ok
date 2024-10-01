@@ -24,9 +24,8 @@ def separate_vocals(audio_file_path, output_folder, model):
     
     # Use the full path to the Demucs executable with the selected model
     try:
-        sanitized_output_folder = sanitize_output_folder(output_folder)
         # Adding the stem specification to extract only vocals
-        subprocess.run([demucs_command, "-n", model, "--two-stems=vocals", audio_file_path, '-o', sanitized_output_folder], check=True)
+        subprocess.run([demucs_command, "-n", model, "--two-stems=vocals", audio_file_path, '-o', output_folder], check=True)
         print(f"Vocals successfully separated for {audio_file_path}")
     except subprocess.CalledProcessError as e:
         print(f"Error during vocal separation: {e}")

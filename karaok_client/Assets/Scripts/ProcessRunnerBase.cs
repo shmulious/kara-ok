@@ -34,7 +34,7 @@ public abstract class ProcessRunnerBase
     }
 
     // Abstract method to be implemented by derived classes, now accepts arguments
-    public abstract Task<ProcessResult> RunProcess<T>(string scriptPath, string arguments = "");
+    public abstract Task<ProcessResult<T>> RunProcess<T>(string scriptPath, string arguments = "");
 
     // Async static method to check if Python is installed
     public static async Task<bool> IsPythonInstalled()

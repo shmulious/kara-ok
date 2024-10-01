@@ -1,7 +1,6 @@
 import os
 import subprocess
 import sys
-
 # Global variable to store the virtual environment path
 _venv_path = None
 
@@ -43,7 +42,7 @@ def activate_venv(venv_path, venv_name):
             subprocess.call([activate_script], shell=True)
         else:
             # For Linux/Mac, source the activate script
-            subprocess.call(f"source {activate_script}", shell=True, executable="/bin/bash")
+            subprocess.call(f'source "{activate_script}"', shell=True, executable="/bin/bash")
         
         # Save the virtual environment path after successful activation
         _venv_path = venv_path
@@ -66,6 +65,7 @@ def ensure_virtual_env(venv_path):
     Ensures that the script is running inside the virtual environment.
     If not, restart the script using the virtual environment's Python interpreter.
     """
+    #venv_path = sanitize_path_q(venv_path)
     venv_python = os.path.join(venv_path, 'bin', 'python') if sys.platform != "win32" else os.path.join(venv_path, 'Scripts', 'python.exe')
 
     # Check if we're running in the virtual environment

@@ -39,16 +39,31 @@ def set_to_config(key, value):
 
     print(f"Updated config: Set {key} to {value}")
 
+def sanitize_value(value):
+    """
+    Sanitize the value by wrapping it with double quotes if it contains spaces.
+    """
+    # Remove any existing quotes
+    value = value.strip('\'"')
+
+    # If the value contains spaces, wrap it in double quotes
+    if " " in value:
+        return f'"{value}"'
+    return value
+
 def get_from_config(key, default_value=None):
     """
     Get the value associated with the key from the config file.
     
     :param key: The key to look up in the configuration.
+    :param is_sanitized: If True, the returned value will be sanitized (default: True).
     :param default_value: The value to return if the key is not found (default: None).
     :return: The value associated with the key or the default value if not found.
     """
     # Load the existing config
     config_data = load_config()
 
-    # Return the value associated with the key, or the default value if the key is not found
-    return config_data.get(key, default_value)
+    # Get the value associated with the key, or the default value if the key is not found
+    value = config_data.get(key, default_value)
+
+    return value

@@ -15,13 +15,13 @@ public class FFmpegInstaller : ProcessRunnerBase
     public FFmpegInstaller() : base() { }
 
     // Implementing the abstract method, returning the InstallFFmpeg result
-    public override async Task<ProcessResult> RunProcess<T>(string scriptPath, string arguments = "")
+    public override async Task<ProcessResult<T>> RunProcess<T>(string scriptPath, string arguments = "")
     {
-        return await InstallFFmpeg();
+        return await InstallFFmpeg<T>();
     }
 
     // Method to install FFmpeg
-    public async Task<ProcessResult> InstallFFmpeg()
+    public async Task<ProcessResult<T>> InstallFFmpeg<T>()
     {
         string url = GetFFmpegUrl();
         string ffmpegZipPath = Path.Combine(Application.persistentDataPath, "ffmpeg.zip");
@@ -33,7 +33,7 @@ public class FFmpegInstaller : ProcessRunnerBase
             {
                 string output = "FFmpeg is already installed.";
                 Log(output);
-                return new ProcessResult(output, "", 0);
+                return new ProcessResult<T>(output, "", 0);
             }
 
             // Download ffmpeg zip
@@ -56,12 +56,12 @@ public class FFmpegInstaller : ProcessRunnerBase
 
             string successMessage = "FFmpeg installation completed.";
             Log(successMessage);
-            return new ProcessResult(successMessage, "", 0);
+            return new ProcessResult<T>(successMessage, "", 0);
         }
         catch (Exception ex)
         {
             LogError($"Failed to install FFmpeg: {ex.Message}");
-            return new ProcessResult("", ex.Message, 1);
+            return new ProcessResult<T>("", ex.Message, 1);
         }
     }
 
