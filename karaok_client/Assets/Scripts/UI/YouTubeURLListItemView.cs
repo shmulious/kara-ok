@@ -1,8 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using RTLTMPro;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -11,43 +14,31 @@ using static UnityEditor.Progress;
 
 public class YouTubeURLListItemView : MonoBehaviour
 {
-    [SerializeField] private TMP_InputField _youtubeUrlInputField;
-    [SerializeField] private Button _processButton;
-    [SerializeField] private Button _removeButton;
-    [SerializeField] private Image _itemStatusIndicator;
-    [SerializeField] private TMP_Text _itemArtist;
-    [SerializeField] private TMP_Text _itemTitle;
+    [SerializeField] private GameObject _thumbnailStatusContainer;
     [SerializeField] private Button _thumbnailButton; // Changed from Image to Button
+    [SerializeField] private GameObject _metadataContainer;
+    [SerializeField] private RTLTextMeshPro _itemArtist;
+    [SerializeField] private RTLTextMeshPro _itemTitle;
+    [SerializeField] private TMP_InputField _youtubeUrlInputField;
+    [SerializeField] private Button _pasteButton;
+    [SerializeField] private Button _processButton;
+    [SerializeField] private Button _getInfoButton;
+    [SerializeField] private Button _openFolderButton;
+    [SerializeField] private Button _removeButton;
+    [SerializeField] private TMP_Text _statusText;
 
-    private SongMetadataData _dataObject;
-
-    public string SongTitle
+    public string URL
     {
-        get { return _itemTitle.text; }
+        get { return _youtubeUrlInputField.text; }
     }
 
-    //// Public property for ThumbnailsData with private set
-    //public List<ThumbnailData> ThumbnailsData { get; private set; } = new List<ThumbnailData>();
-    ///// <summary>
-    ///// Public getter for the current ThumbnailData object.
-    ///// </summary>
-    //public ThumbnailData CurrentThumbnailData
-    //{
-    //    get
-    //    {
-    //        if (ThumbnailsData != null && ThumbnailsData.Count > 0)
-    //        {
-    //            return ThumbnailsData[_currentThumbnailIndex];
-    //        }
-    //        return null;
-    //    }
-    //}
     private int _currentThumbnailIndex = 0; // Tracks the current thumbnail for cycling
 
     private UnityAction<YouTubeURLListItemView> _onRemove;
     private UnityAction<YouTubeURLListItemView, string> _onProcess;
+    [SerializeField] private LoadingAnimationManager _loadingAnimation;
     private PythonRunner _pythonRunner;
-    private SongMetadataGenius _metadataProvider;
+    private string _openFolderPath;
 
     public void RegisterOnRemove(UnityAction<YouTubeURLListItemView> onRemove)
     {
@@ -59,19 +50,61 @@ public class YouTubeURLListItemView : MonoBehaviour
         _onProcess += onProcess;
     }
 
+    public void SetLoadingANimationManager(LoadingAnimationManager loadingAnimationManager)
+    {
+        _loadingAnimation = loadingAnimationManager;
+    }
+
     // Start is called before the first frame update
     void Start()
     {
         _pythonRunner = new PythonRunner();
         _removeButton.onClick.AddListener(OnRemoveButtonClicked);
         _processButton.onClick.AddListener(OnProcessButtonClicked);
-        _youtubeUrlInputField.onDeselect.AddListener(OnURLInputDeselect);
-       // _thumbnailButton.onClick.AddListener(OnThumbnailButtonClicked); // Add listener for thumbnail button click
-        _metadataProvider = new SongMetadataGenius(_pythonRunner);
+        _getInfoButton.onClick.AddListener(OnGetInfoButtonClicked);
+        _openFolderButton.onClick.AddListener(OnOpenButtonClicked);
+        _pasteButton.onClick.AddListener(OnPasteButtonClicked);
+        _youtubeUrlInputField.onDeselect.AddListener(OnYouTubeURLDeselect);
+        // _thumbnailButton.onClick.AddListener(OnThumbnailButtonClicked); // Add listener for thumbnail button click
+        _itemArtist.text = "No Data";
+        _itemTitle.text = "No Data";
     }
 
-    private bool IsValidYoutubeUrl(string url)
+    private void OnYouTubeURLDeselect(string arg0)
     {
+        _getInfoButton.interactable = IsValidYoutubeUrl();
+    }
+
+    private void OnPasteButtonClicked()
+    {
+        string clipboardContent = GUIUtility.systemCopyBuffer;
+        KaraokLogger.Log($"Pasted value: {clipboardContent}");
+        _youtubeUrlInputField.text = clipboardContent;
+        if (IsValidYoutubeUrl())
+        {
+            OnGetInfoButtonClicked();
+        }
+    }
+
+    private async void OnOpenButtonClicked()
+    {
+        _openFolderButton.interactable = false;
+        PathOpener.OpenPath(_openFolderPath);
+        await Task.Delay(2000);
+        _openFolderButton.interactable = true;
+    }
+
+    private void OnGetInfoButtonClicked()
+    {
+        _getInfoButton.interactable = false;
+        _youtubeUrlInputField.interactable = false;
+        _statusText.text = "Fetching song's metadata...";
+        GetMetadata();
+    }
+
+    private bool IsValidYoutubeUrl()
+    {
+        var url = _youtubeUrlInputField.text;
         if (string.IsNullOrWhiteSpace(url))
         {
             return false;
@@ -85,84 +118,74 @@ public class YouTubeURLListItemView : MonoBehaviour
         return regex.IsMatch(url);
     }
 
-    private async void OnURLInputDeselect(string url)
+    private async void GetMetadata()
     {
-        if (!IsValidYoutubeUrl(url)) return;
-        
-        var metadata = await _metadataProvider.FetchMetadata(url);
-        _itemTitle.text = metadata.Title;
-        _itemArtist.text = metadata.Artist;
-        _thumbnailButton.image.sprite = metadata.ThumbnailData.ThumbnailSprite;
-        _dataObject = metadata;
-    }
-    //private async void OnURLInputDeselect(string arg0)
-    //{
-    //    if (!IsValidYoutubeUrl(arg0)) return;
-
-    //    var res = await _pythonRunner.RunProcess<YoutubeMetadata>("main/smule.py", $"--getmetadata \"{arg0}\"");
-    //    if (res.Success && res.Value != null)
-    //    {
-    //        _dataObject = new SongMetadataData(arg0, res.Value.artist, res.Value.title);
-    //        if (res.Value.thumbnails != null)
-    //        {
-    //            _itemArtist.text = res.Value.artist;
-    //            _itemTitle.text = res.Value.title;
-
-    //            // Download the thumbnails and save them to ThumbnailsData
-    //            ThumbnailsData = await res.Value.DownloadThumbnails();
-    //            if (ThumbnailsData.Count > 0)
-    //            {
-    //                _thumbnailButton.image.sprite = ThumbnailsData[0].ThumbnailSprite; // Set the first thumbnail
-    //                _currentThumbnailIndex = 0; // Reset index to the first item
-    //                _dataObject.ThumbnailData = ThumbnailsData[0];
-    //            }
-    //        }
-    //    }
-    //}
-
-    //private void OnThumbnailButtonClicked()
-    //{
-    //    if (ThumbnailsData == null || ThumbnailsData.Count == 0)
-    //    {
-    //        Debug.LogWarning("No thumbnails to display.");
-    //        return;
-    //    }
-
-    //    // Cycle to the next thumbnail
-    //    _currentThumbnailIndex = (_currentThumbnailIndex + 1) % ThumbnailsData.Count; // Loop back to the start after the last item
-    //    _thumbnailButton.image.sprite = ThumbnailsData[_currentThumbnailIndex].ThumbnailSprite; // Update button image
-    //    if (_dataObject != null) _dataObject.ThumbnailData = ThumbnailsData[_currentThumbnailIndex];
-    //}
-
-    private void OnProcessButtonClicked()
-    {
-        if (ValidateLinkInput())
+        if (!IsValidYoutubeUrl())
         {
-            _onProcess?.Invoke(this, _youtubeUrlInputField.text);
+            _statusText.text = "YouTube URL is invalid";
+            _youtubeUrlInputField.interactable = true;
+            return;
+        }
+        
+        _thumbnailStatusContainer.SetActive(true);
+        _getInfoButton.interactable = false;
+
+        var isDone = false;
+
+        _loadingAnimation.StartLoadingScreen(_thumbnailButton.transform, () => { return isDone; }, Color.black);
+        var metadata = await CacheManager.LoadMetadata(URL);
+        isDone = true;
+
+        if (metadata != null)
+        {
+            UpdateGetMetadataUI(true);
+            _itemTitle.text = metadata.Title;
+            _itemTitle.UpdateText();
+            _itemArtist.text = metadata.Artist;
+            _itemArtist.UpdateText();
+
+            _thumbnailButton.image.sprite = ThumbnailsDownloader.SpriteFromTexture(metadata.ThumbnailDatas[0].Texture);
+            
+        }
+        else
+        {
+            UpdateGetMetadataUI(false);
+            _statusText.text = "Error loading song's metadata. Try again!";
+            //return null;
         }
     }
 
-    private bool ValidateLinkInput()
+    private void UpdateGetMetadataUI(bool isMetadataSuccess)
     {
-        //todo: regex for common youtube link formats
-        bool isYoutubeLinkFormat = true;
+        _youtubeUrlInputField.gameObject.SetActive(!isMetadataSuccess);
+        _metadataContainer.SetActive(isMetadataSuccess);
+        _processButton.interactable = isMetadataSuccess;
+        _thumbnailStatusContainer.SetActive(isMetadataSuccess);
+        _getInfoButton.interactable = true;
+    }
 
-        return !string.IsNullOrWhiteSpace(_youtubeUrlInputField.text) && isYoutubeLinkFormat;
+    private async void OnProcessButtonClicked()
+    {
+        if (IsValidYoutubeUrl())
+        {
+            _onProcess?.Invoke(this, URL);
+            var metadata = await CacheManager.LoadMetadata(URL);
+        }
     }
 
     private void OnRemoveButtonClicked()
     {
         _onRemove?.Invoke(this);
-        //todo: implement remove;
     }
 
     private void OnDestroy()
     {
         _removeButton.onClick.RemoveAllListeners();
         _processButton.onClick.RemoveAllListeners();
-        _thumbnailButton.onClick.RemoveAllListeners(); // Remove listener for thumbnail button
+        _openFolderButton.onClick.RemoveAllListeners(); // Remove listener for thumbnail button
+        _pasteButton.onClick.RemoveAllListeners(); // Remove listener for thumbnail button
+        _getInfoButton.onClick.RemoveAllListeners(); // Remove listener for thumbnail button
         _onRemove = null;
-        _youtubeUrlInputField.onValueChanged.RemoveAllListeners();
     }
 
     public string GetText()
@@ -172,22 +195,30 @@ public class YouTubeURLListItemView : MonoBehaviour
 
     public async Task<ProcessResult<string>> Process(string outputFolderPath, int modelNumber)
     {
-        return await SmuleService.ProcessSong(_dataObject, outputFolderPath, modelNumber);
+        LockUI(true);
+
+
+        var isDone = false;
+        _loadingAnimation.StartLoadingScreen(_thumbnailStatusContainer.transform, () => { return isDone; }, null);
+        _onProcess?.Invoke(this, _youtubeUrlInputField.text);
+        var metadata = await CacheManager.LoadMetadata(URL);
+        var result = await SmuleService.ProcessSong(metadata, outputFolderPath, modelNumber);
+        isDone = true;
+        _openFolderButton.interactable = result.Success;
+        _statusText.text = result.Success ? "Finished successfully!" : "Failed with some errors!";
+        _openFolderPath = result.Success ? result.StringVal : null; 
+        return result;
+
     }
-}
 
-public class SongMetadataData
-{
-    public string URL;
-    public string Artist;
-    public string Title;
-    public ThumbnailData ThumbnailData;
-    public string Lyrics;
-
-    public SongMetadataData(string uRL, string artist, string title)
+    internal void LockUI(bool shouldLock)
     {
-        URL = uRL;
-        Artist = artist;
-        Title = title;
+        var isInteractable = !shouldLock;
+        _removeButton.interactable = isInteractable;
+        _processButton.interactable = isInteractable;
+        _getInfoButton.interactable = isInteractable;
+        _openFolderButton.interactable = isInteractable;
+        _pasteButton.interactable = isInteractable;
+        _youtubeUrlInputField.interactable = isInteractable;
     }
 }

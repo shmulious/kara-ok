@@ -6,7 +6,7 @@ public class LyricsProviderHandler
     private readonly ILyricsProvider _primaryProvider;
     private readonly ILyricsProvider _secondaryProvider;
 
-    public LyricsProviderHandler(ILyricsProvider primaryProvider, ILyricsProvider secondaryProvider)
+    public LyricsProviderHandler(ILyricsProvider primaryProvider, ILyricsProvider secondaryProvider = null)
     {
         _primaryProvider = primaryProvider;
         _secondaryProvider = secondaryProvider == null ? primaryProvider : secondaryProvider;
@@ -24,8 +24,13 @@ public class LyricsProviderHandler
             return lyrics;
         }
 
-        // If primary fails, fall back to the secondary provider
-        Debug.Log("Falling back to the secondary provider.");
-        return await _secondaryProvider.GetLyricsAsync(artist, songTitle);
+        if (_secondaryProvider != null)
+        {
+            // If primary fails, fall back to the secondary provider
+            Debug.Log("Falling back to the secondary provider.");
+            return await _secondaryProvider.GetLyricsAsync(artist, songTitle);
+        }
+
+        throw new System.Exception($"Failed to fetch lyrics for {artist} - {songTitle}");
     }
 }

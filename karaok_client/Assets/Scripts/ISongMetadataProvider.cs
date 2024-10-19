@@ -2,5 +2,5 @@
 
 public interface ISongMetadataProvider
 {
-    Task<SongMetadataData> FetchMetadata(string url);
+    Task<SongMetadata> FetchMetadata(string url);
 }

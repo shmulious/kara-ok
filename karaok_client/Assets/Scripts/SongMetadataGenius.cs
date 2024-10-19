@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -9,43 +11,20 @@ public class SongMetadataGenius : SongMetadataBase
 {
     private const string GeniusApiUrl = "https://api.genius.com";
     private readonly string _geniusAccessToken;
+    private ISongMetadata _basicMetadata;
 
-    public SongMetadataGenius(PythonRunner pythonRunner) : base(pythonRunner)
+    public SongMetadataGenius(PythonRunner pythonRunner, ISongMetadata basicMetadata) : base(pythonRunner)
     {
         _geniusAccessToken = "sXqAWwSObRu8jXtBlLLVqQLXGyrfMMi3Ptr0UTILSNwo-Fn7I6ZXGSIdfxd1Gjnj";  // Set your Genius API key here
         _lyricsProviderHandler = new LyricsProviderHandler(new GeniusProvider(_geniusAccessToken), new LyricsOvhProvider());
+        _basicMetadata = basicMetadata;
     }
 
-
-    // Override ComposeDataObject to search the song on Genius API and update the data object
-    protected override async Task<SongMetadataData> ComposeDataObject(SongMetadataData dataObject, ProcessResult<YoutubeMetadata> res)
+    public override async Task Compose(string url)
     {
-        // First, fetch song metadata from the Genius API using artist and title
-        var geniusMetadata = await FetchGeniusMetadata(dataObject.Artist, dataObject.Title);
+        if (_basicMetadata == null) throw new System.Exception($"[SongMetadataGenius] - Compose failed for null _basicMetadata");
 
-        if (geniusMetadata != null)
-        {
-            // Update the data object with information from the Genius API
-            dataObject.Artist = geniusMetadata.ArtistName;
-            dataObject.Title = geniusMetadata.SongTitle;
-            //dataObject.Album = geniusMetadata.AlbumName;
-            //dataObject.ReleaseDate = geniusMetadata.ReleaseDate;
-
-            // Instead of using the thumbnail from `res`, we'll now fetch thumbnails from Genius
-            if (geniusMetadata.AlbumArtUrls != null && geniusMetadata.AlbumArtUrls.Count > 0)
-            {
-                var thumbnailDatas = await FetchThumbnail(geniusMetadata.AlbumArtUrls);
-                dataObject.ThumbnailData = thumbnailDatas;
-            }
-        }
-
-        // Update lyrics based on Genius metadata
-        dataObject.Lyrics = await FetchLyrics(dataObject);
-
-        // Log the updated metadata object
-        Debug.Log(dataObject.ToString());
-
-        return dataObject;
+        Data = await FetchGeniusMetadata(_basicMetadata.Artist, _basicMetadata.Title);
     }
 
     // Main method that fetches metadata from Genius API
@@ -60,19 +39,57 @@ public class SongMetadataGenius : SongMetadataBase
         // Step 3: If response is valid, parse the JSON to extract metadata
         if (!string.IsNullOrEmpty(jsonResponse))
         {
-            return ParseGeniusMetadata(jsonResponse);
+            var geniusData = ParseGeniusMetadata(jsonResponse);
+            if (geniusData == null)
+            {
+                KaraokLogger.LogWarning($"[FetchGeniusMetadata] - failed to find song for {artist} - {title}");
+                if (StringCleaner.ContainsBraces(artist))
+                {
+                    var cleanArtist = StringCleaner.RemoveContentInBracesAndMergeSpaces(artist);
+                    KaraokLogger.LogWarning($"Retrying with clean artist name. was: {artist}. retrying with: {cleanArtist}");
+                    return await FetchGeniusMetadata(cleanArtist, title);
+                }
+                if (StringCleaner.ContainsBraces(title))
+                {
+                    var cleanTitle = StringCleaner.RemoveContentInBracesAndMergeSpaces(title);
+                    KaraokLogger.LogWarning($"Retrying with clean title name. was: {title}. retrying with: {cleanTitle}");
+                    return await FetchGeniusMetadata(artist, cleanTitle);
+                }
+                else
+                {
+                    geniusData = new GeniusSongMetadata
+                    {
+                        ArtistName = artist,
+                        SongTitle = title
+                    };
+                    KaraokLogger.LogWarning($"After retries, Failed to fetch song metadata from Genius. applying basic metadata: {JsonConvert.SerializeObject(geniusData)}");
+                }
+            }
+            geniusData.ArtistName = artist;
+            geniusData.SongTitle = title;
+            geniusData.Lyrics = await FetchLyrics(geniusData);
+            return geniusData;
         }
-
-        Debug.LogError("Failed to fetch song metadata from Genius.");
         return null;
     }
 
- 
+
     // Step 1: Construct the Genius API search URL
     private string ConstructSearchUrl(string artist, string title)
     {
+        // Log the artist and title arguments
+        KaraokLogger.Log($"Constructing Genius API search URL with artist: {artist}, title: {title}");
+
+        // Construct the query
         string query = UnityWebRequest.EscapeURL($"{artist} {title}");
-        return $"{GeniusApiUrl}/search?q={query}";  // No access token needed in URL, it will be sent in the header
+
+        // Construct the search URL
+        string searchUrl = $"{GeniusApiUrl}/search?q={query}";
+
+        // Log the constructed search URL
+        KaraokLogger.Log($"Constructed Genius API search URL: {searchUrl}");
+
+        return searchUrl;
     }
 
     // Step 2: Send a request to the Genius API and return the JSON response as a string
@@ -102,6 +119,7 @@ public class SongMetadataGenius : SongMetadataBase
         }
     }
     // Step 3: Parse the JSON response and return the extracted metadata as a GeniusSongMetadata object
+    // Step 3: Parse the JSON response and return the extracted metadata as a GeniusSongMetadata object
     private GeniusSongMetadata ParseGeniusMetadata(string jsonResponse)
     {
         // Parse the response using Newtonsoft.Json
@@ -118,84 +136,42 @@ public class SongMetadataGenius : SongMetadataBase
         // Extract relevant metadata
         string songTitle = firstHit["title"]?.ToString();
         string artistName = firstHit["primary_artist"]?["name"]?.ToString();
-        string albumArtUrl = firstHit["song_art_image_url"]?.ToString();
+        string albumArtUrl = firstHit["song_art_image_url"]?.ToString(); // Primary image URL
+        string thumbnailUrl = firstHit["header_image_thumbnail_url"]?.ToString(); // Smaller thumbnail image
+        string headerImageUrl = firstHit["header_image_url"]?.ToString(); // Banner image
+
         string releaseDate = firstHit["release_date"]?.ToString() ?? "Unknown";
 
+        // Create a list to hold multiple image URLs
+        var albumArtUrls = new List<string>();
+
+        // Add available image URLs to the list
+        if (!string.IsNullOrEmpty(albumArtUrl)) albumArtUrls.Add(albumArtUrl);
+        if (!string.IsNullOrEmpty(thumbnailUrl)) albumArtUrls.Add(thumbnailUrl);
+        if (!string.IsNullOrEmpty(headerImageUrl)) albumArtUrls.Add(headerImageUrl);
+
         // Return the metadata as a GeniusSongMetadata object
-        return new GeniusSongMetadata
+        var metadata =  new GeniusSongMetadata
         {
             ArtistName = artistName,
             SongTitle = songTitle,
             AlbumName = "Unknown Album",  // Assume the album name isn't provided
             ReleaseDate = releaseDate,
-            AlbumArtUrls = new List<string> { albumArtUrl }  // Assume only one URL for album art
+            AlbumArtUrls = albumArtUrls  // Return the list of available album art URLs
         };
+        // Log the firstHit object using KaraokLogger
+        KaraokLogger.Log($"Found a song on genius: {metadata.ArtistName}");
+        return metadata;
     }
 
     // Override FetchThumbnail to use the Genius metadata's album art URLs for downloading
-    protected override async Task<ThumbnailData> FetchThumbnail(List<string> albumArtUrls)
+    protected override async Task<List<ThumbnailData>> FetchThumbnail(List<string> albumArtUrls)
     {
-        Debug.Log("Fetching thumbnails from Genius metadata...");
+        return null;
+        //Debug.Log("Fetching thumbnails from Genius metadata...");
 
-        // Utilize the base class's DownloadThumbnails method to download the images from the URLs
-        var downloadedThumbnails = await DownloadThumbnails(albumArtUrls);
-        return downloadedThumbnails[0];
+        //// Utilize the base class's DownloadThumbnails method to download the images from the URLs
+        //var downloadedThumbnails = await DownloadThumbnails(albumArtUrls);
+        //return downloadedThumbnails;
     }
-
-    // Fetch thumbnail using Genius data, now using multiple URLs
-    //private async Task<List<ThumbnailData>> DownloadThumbnails(List<string> albumArtUrls)
-    //{
-    //    List<ThumbnailData> thumbnailDataList = new List<ThumbnailData>();
-    //    Debug.Log("Starting Genius thumbnail download process...");
-
-    //    foreach (var thumbnailUrl in albumArtUrls)
-    //    {
-    //        if (string.IsNullOrEmpty(thumbnailUrl))
-    //        {
-    //            Debug.LogError($"Thumbnail URL is empty or null.");
-    //            continue;
-    //        }
-
-    //        Debug.Log($"Attempting to download thumbnail from Genius URL: {thumbnailUrl}");
-
-    //        // Download the image and store it as ThumbnailData
-    //        ThumbnailData thumbnailData = await DownloadImage(thumbnailUrl);
-    //        if (thumbnailData != null)
-    //        {
-    //            thumbnailDataList.Add(thumbnailData);
-    //            Debug.Log($"Successfully downloaded and processed Genius thumbnail from URL: {thumbnailUrl}");
-    //        }
-    //        else
-    //        {
-    //            Debug.LogError($"Failed to download or process Genius thumbnail from URL: {thumbnailUrl}");
-    //        }
-    //    }
-
-    //    Debug.Log($"Genius thumbnail download process complete. Total successfully downloaded: {thumbnailDataList.Count}");
-
-    //    return thumbnailDataList;
-    //}
-
-    // Override FetchLyrics to use the lyrics directly from the Genius metadata
-    protected override async Task<string> FetchLyrics(SongMetadataData dataObject)
-    {
-        // Fetch lyrics directly from Genius metadata if available
-        if (!string.IsNullOrEmpty(dataObject.Lyrics))
-        {
-            return dataObject.Lyrics;
-        }
-
-        // Otherwise, fallback to the base implementation
-        return await base.FetchLyrics(dataObject);
-    }
-}
-
-// Helper class for holding Genius song metadata, extended to include multiple thumbnail URLs
-public class GeniusSongMetadata
-{
-    public string ArtistName { get; set; }
-    public string SongTitle { get; set; }
-    public string AlbumName { get; set; }
-    public string ReleaseDate { get; set; }
-    public List<string> AlbumArtUrls { get; set; } = new List<string>(); // Allow multiple thumbnail URLs
 }

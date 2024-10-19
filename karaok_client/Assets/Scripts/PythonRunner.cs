@@ -50,14 +50,21 @@ public class PythonRunner : ProcessRunnerBase
                     {
                         // Remove the prefix and attempt to deserialize the remaining data into type T
                         var stringVal = args.Data.Replace(RETURN_VALUE_PREFIX, string.Empty);
-                        try
+                        if (typeof(T) == typeof(string))
                         {
-                            var val = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(stringVal);
-                            res.Value = val;
+                            res.StringVal = stringVal;
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            Debug.LogWarning($"[PythonRunner] - Failed to deserialize data to {typeof(T)}: {ex.Message}");
+                            try
+                            {
+                                var val = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(stringVal);
+                                res.Value = val;
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogWarning($"[PythonRunner] - Failed to deserialize data to {typeof(T)}: {ex.Message}");
+                            }
                         }
                     }
 

@@ -108,7 +108,7 @@ public class GeniusProvider : ILyricsProvider
             if (lyricsDiv != null)
             {
                 // Extract the inner text (lyrics) and return it
-                string lyrics = lyricsDiv.InnerText;
+                string lyrics = StringCleaner.ConvertHtmlToPlainText(lyricsDiv.InnerHtml);
                 return lyrics.Trim();  // Return the cleaned lyrics
             }
 

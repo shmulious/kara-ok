@@ -71,6 +71,7 @@ def get_song_metadata(youtube_url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info_dict = ydl.extract_info(youtube_url, download=False)
 
+            video_id = info_dict.get('id', None)
             # Extract relevant metadata
             title = info_dict.get('title', 'Unknown Title')
             artist = info_dict.get('artist', 'Unknown Artist')
@@ -95,14 +96,15 @@ def get_song_metadata(youtube_url):
             result = {
                 "artist": artist,
                 "title": title,
-                "thumbnails": thumbnail_urls
+                "thumbnails": thumbnail_urls,
+                "id": video_id
             }
 
             # Validate the JSON structure
             validate_json_data(result)
 
             # Log the result
-            log_message(f"Extracted metadata from {youtube_url} - Artist: {result['artist']}, Title: {result['title']}, Thumbnails: {result['thumbnails']}")
+            log_message(f"Extracted metadata from {youtube_url} -  json is: {json.dumps(result, indent=4)}")
 
             # Print the JSON formatted result
             print(f"Return Value: {json.dumps(result)}")

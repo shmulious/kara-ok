@@ -47,14 +47,12 @@ public class MainSceneView : MonoBehaviour
         var envExists = envExistsRes.Success;// && envExistsValid;
         Debug.Log($"[MainSceneView] - Environment exists: {envExists}");
 
-        var isFfmpegInstalled = FFmpegInstaller.IsFFmpegInstalled();
-        Debug.Log($"[MainSceneView] - Is FFmpeg installed: {isFfmpegInstalled}");
 
-        Debug.Log($"[MainSceneView] - Awake conditions: isPythonInstalled: {isPythonInstalled}; envExists: {envExists}; isFfmpegInstalled: {isFfmpegInstalled}");
+        Debug.Log($"[MainSceneView] - Awake conditions: isPythonInstalled: {isPythonInstalled}; envExists: {envExists};");
 
-        _envInstallerButton.interactable = isPythonInstalled && (!envExists || !FFmpegInstaller.IsFFmpegInstalled());
-        _demoButton.interactable = isPythonInstalled && envExists && FFmpegInstaller.IsFFmpegInstalled();
-        _processListButton.interactable = isPythonInstalled && envExists && FFmpegInstaller.IsFFmpegInstalled();
+        _envInstallerButton.interactable = isPythonInstalled && (!envExists);
+        _demoButton.interactable = isPythonInstalled && envExists;
+        _processListButton.interactable = isPythonInstalled && envExists;
     }
 
     private Dictionary<int, Func<Task>> _buttonsTasks = new Dictionary<int, Func<Task>>();
@@ -72,10 +70,9 @@ public class MainSceneView : MonoBehaviour
     private async Task OnMainButtonClicked(Button button)
     {
         Debug.Log($"[MainSceneView] - OnMainButtonClicked for button: {button.name}");
-        button.interactable = false;
-
         if (_buttonsTasks.TryGetValue(button.GetInstanceID(), out var task))
         {
+            button.interactable = false;
             try
             {
                 Debug.Log($"[MainSceneView] - Executing task for button: {button.name}");
@@ -84,6 +81,10 @@ public class MainSceneView : MonoBehaviour
             catch (Exception ex)
             {
                 Debug.LogError($"[MainSceneView] - Error executing task for button: {button.name} - {ex.Message}");
+            }
+            finally
+            {
+                button.interactable = true;
             }
         }
         else
@@ -99,10 +100,12 @@ public class MainSceneView : MonoBehaviour
         var youtubeUrls = _listHolder._listItems;
         var modelNumber = _modelDropdown.value + 1;
         var outputFolderPath = Path.Combine(ProcessRunnerBase.ENV_PATH, "output");
+        _listHolder.LockListItemsExcept(null, true);
         foreach (var item in youtubeUrls)
         {
             var t = await item.Process(outputFolderPath, modelNumber);
         }
+        _listHolder.LockListItemsExcept(null, false);
     }
 
     private async Task RunDemo()

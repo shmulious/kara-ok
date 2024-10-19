@@ -26,3 +26,4 @@ def setup_logging(log_file='smule.log'):
 def log_message(message):
     """Log a message to both the log file and the console."""
     logging.info(message)
+    print(message)

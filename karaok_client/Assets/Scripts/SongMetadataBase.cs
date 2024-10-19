@@ -2,158 +2,92 @@
 using System.Collections.Generic;
 using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
+using KtxUnity;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class SongMetadataBase : ISongMetadataProvider
+public abstract class SongMetadataBase
 {
-    private readonly PythonRunner _pythonRunner;
+    protected PythonRunner _pythonRunner;
     protected LyricsProviderHandler _lyricsProviderHandler;
+    protected ISongMetadata _metadata;
+    public ISongMetadata Data
+    {
+        get { return _metadata; }
+        protected set
+        {
+            _metadata = value;
+        }
+    }
 
     public SongMetadataBase(PythonRunner pythonRunner)
     {
         _pythonRunner = pythonRunner;
-        _lyricsProviderHandler = new LyricsProviderHandler(new LyricsOvhProvider(), null);
     }
 
-    public async Task<SongMetadataData> FetchMetadata(string url)
-    {
-        // Calling the Python script with the --getmetadata option
-        var res = await _pythonRunner.RunProcess<YoutubeMetadata>("main/smule.py", $"--getmetadata \"{url}\"");
+    public abstract Task Compose(string url);
 
-        if (res.Success && res.Value != null)
+    // CreateAsync method to asynchronously create and initialize an instance of T
+    public static async Task<T> CreateAsync<T>(string url, Func<PythonRunner, T> factory) where T : SongMetadataBase
+    {
+        // Step 1: Create a PythonRunner instance
+        var pythonRunner = new PythonRunner();
+
+        // Step 2: Use the factory to create an instance of T with the PythonRunner
+        T instance = factory(pythonRunner);
+
+        // Step 3: Call the Compose method to initialize the instance
+        await instance.Compose(url);
+
+        // Step 4: Return the initialized instance
+        return instance;
+    }
+
+    //public Task<SongMetadataData> FetchMetadata(string url)
+    //{
+    //    throw new NotImplementedException();
+    //}
+
+    protected virtual async Task<string> FetchLyrics(ISongMetadata _basicMetadata)
+    {
+        if (_lyricsProviderHandler == null) throw new Exception($"[{this.GetType()}] - This metadata provider does not support lyrics fetching");
+        if (_basicMetadata == null || string.IsNullOrWhiteSpace(_basicMetadata.Artist) || string.IsNullOrWhiteSpace(_basicMetadata.Title)) KaraokLogger.LogError($"[{this.GetType()}] - Fetch lyrics failed for null values!");
+        try
         {
-            // If Python script returns metadata successfully, create SongMetadataObject
-            var dataObject = new SongMetadataData(url, res.Value.artist, res.Value.title);
-            return await ComposeDataObject(dataObject, res);
+            var l = await _lyricsProviderHandler.GetLyricsAsync(_basicMetadata.Artist, _basicMetadata.Title);
+            return StringCleaner.RemoveContentInBracesAndMergeSpaces(l);
         }
-        else
+        catch (Exception ex)
         {
-            Debug.LogError("Failed to fetch song metadata from the Python script.");
+            throw ex;
         }
-        return null;
     }
 
-    protected virtual async Task<SongMetadataData> ComposeDataObject(SongMetadataData dataObject, ProcessResult<YoutubeMetadata> res)
+    protected virtual async Task<List<ThumbnailData>> FetchThumbnail(List<string> thumbnails)
     {
-        dataObject.ThumbnailData = await FetchThumbnail(res.Value.thumbnails);
-        dataObject.Lyrics = await FetchLyrics(dataObject);
-        // Example usage: Log the metadata to Unity console
-        Debug.Log(dataObject.ToString());
-        return dataObject;
-    }
-
-    protected virtual async Task<string> FetchLyrics(SongMetadataData dataObject)
-    {
-        var l = await _lyricsProviderHandler.GetLyricsAsync(dataObject.Artist, dataObject.Title);
-        return l;
-    }
-
-    protected virtual async Task<ThumbnailData> FetchThumbnail(List<string> thumbnails)
-    {
-        var pool = await DownloadThumbnails(thumbnails);
-        if (pool.Count > 0)
+        if (thumbnails == null || thumbnails.Count == 0)
         {
-            return pool[0];
+            KaraokLogger.LogError($"[{this.GetType()}] - Fetch thumbnails failed! no thumbnails reference urls data collected");
         }
-        return null;
-    }
-
-    /// <summary>
-    /// Downloads the images from the thumbnail URLs and stores them as a list of ThumbnailData.
-    /// </summary>
-    /// <returns>A list of ThumbnailData representing the downloaded thumbnails.</returns>
-    protected async Task<List<ThumbnailData>> DownloadThumbnails(List<string> thumbnails)
-    {
-        List<ThumbnailData> thumbnailDataList = new List<ThumbnailData>();
-        Debug.Log("Starting thumbnail download process...");
-
-        foreach (var thumbnailUrl in thumbnails)
+        try
         {
-            if (string.IsNullOrEmpty(thumbnailUrl))
+            var pool = new List<ThumbnailData>();// await DownloadThumbnails(thumbnails);
+            if (pool.Count > 0)
             {
-                Debug.LogError($"Thumbnail URL is empty or null.");
-                continue;
-            }
-
-            Debug.Log($"Attempting to download thumbnail from URL: {thumbnailUrl}");
-
-            // Download the image and store it as ThumbnailData
-            ThumbnailData thumbnailData = await DownloadImage(thumbnailUrl);
-            if (thumbnailData != null)
-            {
-                thumbnailDataList.Add(thumbnailData);
-                Debug.Log($"Successfully downloaded and processed thumbnail from URL: {thumbnailUrl}");
+                return pool;
             }
             else
             {
-                Debug.LogError($"Failed to download or process thumbnail from URL: {thumbnailUrl}");
-            }
-        }
-
-        Debug.Log($"Thumbnail download process complete. Total successfully downloaded: {thumbnailDataList.Count}");
-
-        return thumbnailDataList;
-    }
-
-    /// <summary>
-    /// Downloads a single image from a URL and stores it as a ThumbnailData object, including the sprite.
-    /// </summary>
-    /// <param name="url">The URL of the image.</param>
-    /// <returns>A ThumbnailData object if successful, or null if the download fails.</returns>
-    private async Task<ThumbnailData> DownloadImage(string url)
-    {
-        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(url))
-        {
-            // Send the web request and wait for it to complete
-            var operation = request.SendWebRequest();
-
-            while (!operation.isDone)
-                await Task.Yield(); // Await the task to avoid blocking
-
-            // Check if there were any errors in the request
-            if (request.result != UnityWebRequest.Result.Success)
-            {
-                Debug.LogError($"Failed to download image: {request.error}");
+                KaraokLogger.LogError($"[{this.GetType()}] - Fetch thumbnails failed! Couldn't download any thumbnail");
                 return null;
             }
-
-            // Get the texture from the request
-            Texture2D texture = DownloadHandlerTexture.GetContent(request);
-
-            // If texture is valid, create ThumbnailData
-            if (texture != null)
-            {
-                Debug.Log($"Successfully downloaded image from URL: {url}");
-
-                // Create a sprite from the texture
-                Sprite sprite = SpriteFromTexture(texture);
-
-                ThumbnailData thumbnailData = new ThumbnailData
-                {
-                    OriginalSize = new Vector2(texture.width, texture.height),
-                    Texture = texture,
-                    ThumbnailSprite = sprite, // Store the sprite
-                    Url = url
-                };
-
-                //downloadedThumbnails.Add(thumbnailData); // Add to the class-wide list for future reference
-                return thumbnailData;
-            }
-
-            Debug.LogError("Failed to create texture from downloaded image.");
-            return null;
         }
-    }
-
-    /// <summary>
-    /// Converts a Texture2D to a Sprite.
-    /// </summary>
-    /// <param name="texture">The Texture2D to convert.</param>
-    /// <returns>A Sprite created from the texture.</returns>
-    private Sprite SpriteFromTexture(Texture2D texture)
-    {
-        return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+        catch (Exception ex)
+        {
+            throw ex;
+        }
     }
 }

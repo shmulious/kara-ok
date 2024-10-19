@@ -7,7 +7,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(PROJECT_ROOT)
 
 from scripts.main.installer import setup_environment
-from scripts.main.config_manager import set_to_config, get_from_config
+from scripts.main.config_manager import set_to_config, get_from_config, load_config
 from scripts.main.environment import activate_venv, check_environment, ensure_virtual_env
 
 VENV_NAME = "smule-env"
@@ -26,18 +26,11 @@ def init_action(containing_folder_path):
     """
     Initialize the environment, install ffmpeg, and save paths in config.
     """
-    # containing_folder_path = os.path.expanduser(containing_folder_path)
-    print(f"[Init] - containing_folder_path is {containing_folder_path}")
-    venv_path = os.path.join(containing_folder_path, "venvs", VENV_NAME)
-    print(f"[Init] - venv_path is {venv_path}")
-    
-    # Install FFmpeg
-    ffmpeg_path = os.path.join(containing_folder_path, "ffmpeg", "ffmpeg")
+    # Load the current configuration
+    config_data = load_config()
 
-    # Save both venv_path and ffmpeg_path to the config
-    set_to_config('venv_path', venv_path)
-    set_to_config('ffmpeg_path', ffmpeg_path)
-    set_to_config('containing_folder_path', containing_folder_path)
+    # Print the current configuration loaded from the file
+    print("Loaded configuration:", config_data)
 
 def environment_exists():
     """
@@ -62,7 +55,7 @@ def main():
     # Command options
     parser.add_argument('--init', nargs=1, metavar=('containing_folder_path'), help="Initialize and set up environment with the given folder path")
     parser.add_argument('--install', action='store_true', help="Create or overwrite the virtual environment and install necessary packages")
-    parser.add_argument('--convert', nargs=3, metavar=('youtube_url', 'output_folder', 'model'), help="Run the process for downloading and converting the YouTube video. Model is an integer between 1 (fastest) and 4 (slowest), default is 2.")
+    parser.add_argument('--convert', nargs=3, metavar=('metadata_path', 'output_folder', 'model'), help="Run the process for downloading and converting the YouTube video. Model is an integer between 1 (fastest) and 4 (slowest), default is 2.")
     parser.add_argument('--wav2m4a', nargs=2, metavar=('input_file_path', 'output_directory_path'), help="Convert a WAV file to M4A format")
     parser.add_argument('--version', action='store_true', help="Check if the environment is installed")
     parser.add_argument('--demo', action='store_true', help="Run the process with hardcoded demo arguments")
@@ -103,18 +96,18 @@ def main():
         if args.getmetadata:
             from scripts.functional.metadata_provider import get_song_metadata
             youtube_url = args.getmetadata[0]
-            artist, title, thumbnail = get_song_metadata(youtube_url)
+            artist, title, thumbnail, id = get_song_metadata(youtube_url)
             print(f"Artist: {artist}, Title: {title}, Thumbnail: {thumbnail}")
             sys.exit(0)
 
         if args.convert:
             log_environment_details(venv_path)
             if check_environment(venv_path, VENV_NAME):
-                youtube_url, output_folder, model = args.convert
+                metadata_path, output_folder, model = args.convert
                 model = int(model) if model else 2  # Default to 2 if model is not provided
 
                 from scripts.main.converter import convert
-                convert(youtube_url, output_folder, model)
+                convert(metadata_path, output_folder, model)
                 exit(0)
             else:
                 print(f"Error: Environment '{VENV_NAME}' is not installed. Run 'smule.py --install' first.")

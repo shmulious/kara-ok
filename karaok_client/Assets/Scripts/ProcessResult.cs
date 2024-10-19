@@ -11,6 +11,8 @@ public class ProcessResult<T>
 
     public bool Success => ExitCode == 0;
 
+    public string StringVal { get; set; }
+
     public ProcessResult()
     {
         

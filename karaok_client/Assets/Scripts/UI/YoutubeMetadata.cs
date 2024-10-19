@@ -1,26 +1,30 @@
-﻿using UnityEngine;
-using UnityEngine.Networking;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-/// <summary>
-/// Represents the data for a downloaded thumbnail, including its texture, sprite, size, and URL.
-/// </summary>
-public class ThumbnailData
-{
-    public Vector2 OriginalSize { get; set; }
-    public Texture2D Texture { get; set; }
-    public Sprite ThumbnailSprite { get; set; }
-    public string Url { get; set; }
-}
+﻿using System.Threading.Tasks;
+using System;
 
 public abstract class JsonValueFromProcess
 {
 }
 
-public class YoutubeMetadata : JsonValueFromProcess
+public class YoutubeMetadata : SongMetadataBase
 {
-    public string artist;
-    public string title;
-    public List<string> thumbnails; // List of thumbnail URLs
+
+    public YoutubeMetadata(PythonRunner pythonRunner) : base (pythonRunner)
+    {
+        _pythonRunner = pythonRunner;
+    }
+
+    public override async Task Compose(string url)
+    {
+        // Calling the Python script with the --getmetadata option
+        var res = await _pythonRunner.RunProcess<YTMetadataData>("main/smule.py", $"--getmetadata \"{url}\"");
+        if (res.Success)
+        {
+            Data = res.Value;
+
+        }
+        else
+        {
+            throw new Exception($"[YoutubeMetadata] - Compose() failed - Error: {res.ExitCode} - {res.Error}");
+        }
+    }
 }
