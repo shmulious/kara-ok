@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using DataClasses;
 using Newtonsoft.Json;
 using UnityEngine;
 
 public class CacheManager
 {
-    private const string DATA_FILE_NAME = "metadata.json";
-    private static string CachePath
+    public static string CachePath
     {
         get
         {
@@ -18,7 +18,7 @@ public class CacheManager
         }
     }
     private static Dictionary<string, string> Cache = new Dictionary<string, string>();
-    internal static async Task<SongMetadata> LoadMetadata(string uRL)
+    public static async Task<SongMetadata> LoadMetadata(string uRL)
     {
         if (!Cache.ContainsKey(uRL))
         {
@@ -36,14 +36,12 @@ public class CacheManager
         var tyMetadata = await YoutubeMetadata.CreateAsync<YoutubeMetadata>(url, pythonRunner => new YoutubeMetadata(pythonRunner) );
         var geniusMetaData = await SongMetadataGenius.CreateAsync<SongMetadataGenius>(url, pythonRunner => new SongMetadataGenius(pythonRunner, tyMetadata.Data));
         var songMetadata = await SongMetadata.CreateAsync(url, new List<ISongMetadata> { tyMetadata.Data, geniusMetaData.Data});
-        var filePath = Path.Combine(CachePath, $"{songMetadata.YTMetadata.id}", DATA_FILE_NAME);
-        songMetadata.Path = filePath;
-        await WriteFile(filePath, songMetadata.ToJson());
+        await WriteFileAsync(songMetadata.ToJson(), songMetadata.MetadataPath);
         
         return songMetadata;
     }
 
-    private static async Task WriteFile(string filePath, string content)
+    public static async Task<string> WriteFileAsync(string content, string filePath)
     {
         string directoryPath = Path.GetDirectoryName(filePath);
 
@@ -52,16 +50,16 @@ public class CacheManager
         {
             Directory.CreateDirectory(directoryPath);
         }
-
         // Write the JSON to the file asynchronously
         await File.WriteAllTextAsync(filePath, content);
+        return filePath;
     }
 
     // Method to cache the texture and return the file path
-    public static string CacheTexture(Texture2D texture, string id, int index)
+    public static string CacheTexture(Texture2D texture, string cachePath, int index)
     {
         // Ensure the cache directory exists
-        string textureDirectory = Path.Combine(CachePath, id);
+        string textureDirectory = cachePath;
         if (!Directory.Exists(textureDirectory))
         {
             Directory.CreateDirectory(textureDirectory);

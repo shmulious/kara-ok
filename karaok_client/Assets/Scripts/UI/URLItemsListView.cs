@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,6 +10,8 @@ namespace UI
     {
         [SerializeField] private YouTubeURLListItemView _itemViewPrefab;
         public List<YouTubeURLListItemView> _listItems { get; private set; }
+
+        private HotkeyManager _hotkeysManager;
         [SerializeField] private Button _addItemButton;
         [SerializeField] private LoadingAnimationManager _loadingAnimationManager;
 
@@ -16,7 +19,18 @@ namespace UI
         {
             _addItemButton.onClick.AddListener(InstantiateListItem);
             _listItems = new List<YouTubeURLListItemView>();
+            _hotkeysManager = gameObject.AddComponent<HotkeyManager>();
+            _hotkeysManager.RegisterHotkeyAction(KeyCode.A, InstantiateListItem);
+            _hotkeysManager.RegisterHotkeyAction(KeyCode.D, InstantiateListItemFromClipboard);
+            InstantiateListItemFromClipboard();
+        }
+
+        private async void InstantiateListItemFromClipboard()
+        {
             InstantiateListItem();
+            await System.Threading.Tasks.Task.Delay(500);
+            string clipboardContent = GUIUtility.systemCopyBuffer;
+            _listItems.Last().SetURL(clipboardContent);
         }
 
         private void InstantiateListItem()
@@ -25,9 +39,9 @@ namespace UI
             go.transform.localScale = Vector3.one;
             go.RegisterOnRemove(RemoveItemFromList);
             go.RegisterOnProcess(OnProcessClicked);
-            go.SetLoadingANimationManager(_loadingAnimationManager);
-            _listItems.Add(go);
+            go.SetLoadingAnimationManager(_loadingAnimationManager);
             _addItemButton.transform.parent.SetAsLastSibling();
+            _listItems.Add(go);
         }
 
         private void OnProcessClicked(YouTubeURLListItemView itemClicked, string arg1)

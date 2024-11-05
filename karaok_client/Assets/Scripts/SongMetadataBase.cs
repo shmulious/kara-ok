@@ -4,6 +4,7 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using DataClasses;
 using KtxUnity;
 using Unity.Collections;
 using UnityEngine;
@@ -58,7 +59,7 @@ public abstract class SongMetadataBase
         try
         {
             var l = await _lyricsProviderHandler.GetLyricsAsync(_basicMetadata.Artist, _basicMetadata.Title);
-            return StringCleaner.RemoveContentInBracesAndMergeSpaces(l);
+            return l;
         }
         catch (Exception ex)
         {

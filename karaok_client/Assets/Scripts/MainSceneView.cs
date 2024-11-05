@@ -103,7 +103,7 @@ public class MainSceneView : MonoBehaviour
         _listHolder.LockListItemsExcept(null, true);
         foreach (var item in youtubeUrls)
         {
-            var t = await item.Process(outputFolderPath, modelNumber);
+            var result = await item.Process(outputFolderPath, modelNumber);
         }
         _listHolder.LockListItemsExcept(null, false);
     }

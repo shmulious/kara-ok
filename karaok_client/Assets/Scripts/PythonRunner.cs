@@ -7,7 +7,7 @@ using Debug = UnityEngine.Debug;
 
 public class PythonRunner : ProcessRunnerBase
 {
-    const string PYTHON_SCRIPTS_ROOT = "ExternalScripts/KaraOK_1.0/scripts";
+    public const string PYTHON_SCRIPTS_ROOT = "ExternalScripts/KaraOK_1.0/scripts";
     const string RETURN_VALUE_PREFIX = "Return Value: ";
 
     // Override the abstract method to run a Python script with optional arguments

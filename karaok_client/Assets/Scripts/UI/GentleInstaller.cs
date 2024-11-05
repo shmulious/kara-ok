@@ -29,8 +29,8 @@ public class GentleInstaller : MonoBehaviour
         process.StartInfo.UseShellExecute = false;
         process.StartInfo.CreateNoWindow = true;
         KaraokLogger.Log(process.StartInfo.Arguments);
-        process.OutputDataReceived += (sender, args) => KaraokLogger.Log("Output: {0}", args.Data);
-        process.ErrorDataReceived += (sender, args) => KaraokLogger.LogError("Error: {0}", args.Data);
+        process.OutputDataReceived += (sender, args) => KaraokLogger.Log($"Output: {args.Data}");
+        process.ErrorDataReceived += (sender, args) => KaraokLogger.LogError($"Error: {args.Data}");
 
         // Start the process asynchronously and wait for it to finish
         process.Start();
@@ -46,7 +46,7 @@ public class GentleInstaller : MonoBehaviour
         }
         else
         {
-            KaraokLogger.LogError("Gentle installation failed with exit code {0}.", process.ExitCode);
+            KaraokLogger.LogError($"Gentle installation failed with exit code {process.ExitCode}");
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using System;
+using DataClasses;
 
 public abstract class JsonValueFromProcess
 {

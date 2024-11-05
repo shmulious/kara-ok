@@ -3,18 +3,18 @@ using UnityEngine;
 
 public static class KaraokLogger
 {
-    public static void Log(string message, params object[] args)
+    public static void Log(string message)
     {
-        Debug.Log(string.Format(message, args));
+        Debug.Log(message);
     }
 
-    public static void LogError(string message, params object[] args)
+    public static void LogError(string message)
     {
-        Debug.LogError(string.Format(message, args));
+        Debug.LogError(message);
     }
 
-    public static void LogWarning(string message, params object[] args)
+    public static void LogWarning(string message)
     {
-        Debug.LogWarning(string.Format(message, args));
+        Debug.LogWarning(message);
     }
 }
