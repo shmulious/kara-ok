@@ -67,9 +67,9 @@ def convert(metadata_path, output_folder, model_int=2):
         song_name = os.path.basename(audio_file_path).replace(".wav", "")
         demucs_outputs = os.path.join(temp_output_folder, demucs_model, song_name)
         move(audio_file_path, demucs_outputs)
-        destination_folder = os.path.join(output_folder, "outputs")
+        # destination_folder = os.path.join(output_folder, "outputs")
         # Move the files, overwriting duplicates but keeping the folder intact
-        song_outputs_path = os.path.join(destination_folder, song_name)
+        song_outputs_path = os.path.join(output_folder, song_name)
         move(demucs_outputs, song_outputs_path)
         #save vocals and no vocals paths
         no_vocals_path = os.path.join(song_outputs_path, "no_vocals.wav")
