@@ -117,10 +117,16 @@ async function getMediaUrl(url) {
     let artist = null;
     let title = null;
 
-    // Listen for media network requests and add unique URLs to the set
+    // Listen for network requests to capture media URLs
     page.on('response', async (response) => {
         const request = response.request();
-        if (request.resourceType() === 'media' && /(.mp4|.m4a|.aac|.mp3)$/i.test(request.url())) {
+
+        // Check if the request is an `xhr` and contains `.ts` files
+        if (request.resourceType() === 'xhr' && /\.ts$/i.test(request.url())) {
+            mediaUrls.add(request.url());
+        }
+        // Check for other media files in `media` requests
+        else if (request.resourceType() === 'media' && /(.mp4|.m4a|.aac|.mp3)$/i.test(request.url())) {
             mediaUrls.add(request.url());
         }
     });

@@ -175,22 +175,40 @@ install_git() {
     fi
 }
 
-# Function to install or validate ffmpeg
+# Function to install ffmpeg inside virtual environment
 install_ffmpeg() {
-    if [ "$IS_FRESH_INSTALL" -eq 1 ] || ! command -v ffmpeg &> /dev/null; then
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            echo "Installing ffmpeg on macOS..."
-            brew install ffmpeg
-        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            echo "Installing ffmpeg on Linux..."
-            sudo apt-get install -y ffmpeg
-        elif [[ "$OSTYPE" == "msys" ]]; then
-            echo "Installing ffmpeg on Windows..."
-            choco install ffmpeg
-        fi
+    echo "Installing ffmpeg inside virtual environment..."
+    FFMPEG_DIR="$VENV_PATH/ffmpeg"
+    mkdir -p "$FFMPEG_DIR"
+
+    # Download and extract ffmpeg binaries
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        echo "Downloading ffmpeg for macOS..."
+        curl -L -o "$FFMPEG_DIR/ffmpeg-macos.tar.xz" https://evermeet.cx/ffmpeg/ffmpeg-4.4.2.tar.xz
+        tar -xJf "$FFMPEG_DIR/ffmpeg-macos.tar.xz" -C "$FFMPEG_DIR"
+        FFMPEG_BINARY="$FFMPEG_DIR/ffmpeg"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux
+        echo "Downloading ffmpeg for Linux..."
+        curl -L -o "$FFMPEG_DIR/ffmpeg-linux.tar.xz" https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-i686-static.tar.xz
+        tar -xJf "$FFMPEG_DIR/ffmpeg-linux.tar.xz" -C "$FFMPEG_DIR"
+        FFMPEG_BINARY="$FFMPEG_DIR/ffmpeg"
+    elif [[ "$OSTYPE" == "msys" ]]; then
+        # Windows (using Chocolatey)
+        echo "Installing ffmpeg on Windows using Chocolatey..."
+        choco install ffmpeg -y
+        FFMPEG_BINARY="ffmpeg"
     else
-        echo "ffmpeg is already installed."
+        echo "Unsupported OS for ffmpeg installation."
+        exit 1
     fi
+
+    echo "ffmpeg installed at $FFMPEG_BINARY"
+
+    # Export ffmpeg path for use in the virtual environment
+    export IMAGEIO_FFMPEG_EXE="$FFMPEG_BINARY"
+    echo "Set IMAGEIO_FFMPEG_EXE to $FFMPEG_BINARY"
 }
 
 # Function to install Gentle
