@@ -1,23 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using DataClasses;
+using UnityEngine;
+using UnityEngine.Video;
 
 public class CachedSongFiles
 {
-    // Define constants for dictionary keys
-    public const string LyricsKey = "Lyrics";
-    public const string NoVocalsKey = "NoVocals";
-    public const string VocalsKey = "Vocals";
-    public const string OriginalKey = "Original";
-    public const string PlaybackKey = "Playback";
+    // Define an enum for the file keys
+    public enum FileKey
+    {
+        Lyrics,
+        NoVocals,
+        Vocals,
+        Original,
+        FinalPlayback
+    }
+
+    // Map enum values to string representations
+    private static readonly Dictionary<FileKey, string> FileKeyStrings = new Dictionary<FileKey, string>
+    {
+        { FileKey.Lyrics, "Lyrics" },
+        { FileKey.NoVocals, "NoVocals" },
+        { FileKey.Vocals, "Vocals" },
+        { FileKey.Original, "Original" },
+        { FileKey.FinalPlayback, "Playback" }
+    };
 
     // Main dictionary to store cached files
-    private Dictionary<string, CachedSongFile> _cachedFiles;
+    public Dictionary<object, CachedSongFile> CachedFiles { get; set; }
 
     public CachedSongFiles()
     {
-        _cachedFiles = new Dictionary<string, CachedSongFile>(StringComparer.OrdinalIgnoreCase);
+        CachedFiles = new Dictionary<object, CachedSongFile>();
     }
 
     // Constructor that gets a cache path and scans for files accordingly
@@ -44,11 +60,18 @@ public class CachedSongFiles
         }
     }
 
-    // Indexer to access cached files by key
+    // Indexer to access cached files by key (enum or custom string)
+    public CachedSongFile this[FileKey key]
+    {
+        get => CachedFiles.ContainsKey(key.ToString()) ? CachedFiles[key.ToString()] : null;
+        set => CachedFiles[key.ToString()] = value;
+    }
+    
+    // Indexer to access cached files by key (enum or custom string)
     public CachedSongFile this[string key]
     {
-        get => _cachedFiles.ContainsKey(key) ? _cachedFiles[key] : null;
-        set => _cachedFiles[key] = value;
+        get => CachedFiles.ContainsKey(key) ? CachedFiles[key] : null;
+        set => CachedFiles[key] = value;
     }
 
     // Method to process files in a directory
@@ -62,7 +85,7 @@ public class CachedSongFiles
             {
                 if (fileName.Equals("lyrics.txt", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddFileToCache(LyricsKey, file, CachedSongFile.FileType.Text);
+                    AddFileToCache(FileKey.Lyrics, file, CachedSongFile.FileType.Text);
                 }
                 else if (IsImageFile(fileName))
                 {
@@ -73,35 +96,49 @@ public class CachedSongFiles
             {
                 if (fileName.Equals("no_vocals.wav", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddFileToCache(NoVocalsKey, file, CachedSongFile.FileType.Audio);
+                    AddFileToCache(FileKey.NoVocals, file, CachedSongFile.FileType.Audio);
                 }
                 else if (fileName.Equals("vocals.wav", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddFileToCache(VocalsKey, file, CachedSongFile.FileType.Audio);
+                    AddFileToCache(FileKey.Vocals, file, CachedSongFile.FileType.Audio);
                 }
                 else if (fileName.Equals($"{subdirectoryName}.wav", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddFileToCache(OriginalKey, file, CachedSongFile.FileType.Audio);
+                    AddFileToCache(FileKey.Original, file, CachedSongFile.FileType.Audio);
                 }
                 else if (fileName.Equals($"{subdirectoryName}_no_vocals.m4a", StringComparison.OrdinalIgnoreCase))
                 {
-                    AddFileToCache(PlaybackKey, file, CachedSongFile.FileType.Audio);
+                    AddFileToCache(FileKey.FinalPlayback, file, CachedSongFile.FileType.Audio);
                 }
             }
         }
     }
 
-    // Helper method to add files to the dictionary with error handling for duplicates
-    private void AddFileToCache(string key, string filePath, CachedSongFile.FileType fileType)
+    // Helper method to add files to the dictionary with enum keys
+    private void AddFileToCache(FileKey key, string filePath, CachedSongFile.FileType fileType)
     {
-        if (!_cachedFiles.ContainsKey(key))
+        if (!CachedFiles.ContainsKey(key))
         {
-            _cachedFiles[key] = new CachedSongFile(filePath, fileType);
-            KaraokLogger.Log($"Cached '{key}' file: {filePath}");
+            CachedFiles[key] = new CachedSongFile(filePath, fileType);
+            KaraokLogger.Log($"Cached '{FileKeyStrings[key]}' file: {filePath}");
         }
         else
         {
-            KaraokLogger.Log($"Warning: Duplicate file key '{key}' encountered for path {filePath}. Existing entry will be kept.");
+            KaraokLogger.Log($"Warning: Duplicate file key '{FileKeyStrings[key]}' encountered for path {filePath}. Existing entry will be kept.");
+        }
+    }
+
+    // Helper method to add files to the dictionary with custom string keys (e.g., image files)
+    private void AddFileToCache(string customKey, string filePath, CachedSongFile.FileType fileType)
+    {
+        if (!CachedFiles.ContainsKey(customKey))
+        {
+            CachedFiles[customKey] = new CachedSongFile(filePath, fileType);
+            KaraokLogger.Log($"Cached custom file '{customKey}': {filePath}");
+        }
+        else
+        {
+            KaraokLogger.Log($"Warning: Duplicate custom file key '{customKey}' encountered for path {filePath}. Existing entry will be kept.");
         }
     }
 
@@ -114,6 +151,35 @@ public class CachedSongFiles
     // Method to get the count of cached files
     public int Count()
     {
-        return _cachedFiles.Count;
+        return CachedFiles.Count;
+    }
+    
+    // New method to load AudioClip, VideoPlayer, or TextAsset
+    public async Task<T> LoadMediaAsync<T>(string key) where T : class
+    {
+        if (!CachedFiles.TryGetValue(key, out var cachedFile))
+        {
+            throw new KeyNotFoundException($"FileKey '{key}' not found in cached files.");
+        }
+
+        string filePath = cachedFile.LocalPath;
+        Debug.Log($"Attempting to load media for key '{key}' from path: {filePath}");
+
+        if (typeof(T) == typeof(TextAsset))
+        {
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException($"File not found at path: {filePath}");
+            }
+
+            string textContent = await File.ReadAllTextAsync(filePath);
+            return new TextAsset(textContent) as T;
+        }
+        else if (typeof(T) == typeof(AudioClip) || typeof(T) == typeof(VideoPlayer))
+        {
+            return await MediaLoader.LoadMediaFromPath<T>(filePath);
+        }
+
+        throw new NotSupportedException($"Unsupported media type: {typeof(T)}");
     }
 }

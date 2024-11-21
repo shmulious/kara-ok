@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DataClasses;
+using SYncTest;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,6 +11,9 @@ namespace UI
     public class URLItemsListView : MonoBehaviour
     {
         [SerializeField] private YouTubeURLListItemView _itemViewPrefab;
+        [SerializeField] private LyricsSyncPanel _lyricsSyncPanel;
+        [SerializeField] private Sprite _entryTypeSpriteYouTube;
+        [SerializeField] private Sprite _entryTypeSpriteSmule;
         public List<YouTubeURLListItemView> _listItems { get; private set; }
 
         private HotkeyManager _hotkeysManager;
@@ -27,26 +32,45 @@ namespace UI
 
         private async void InstantiateListItemFromClipboard()
         {
-            InstantiateListItem();
             await System.Threading.Tasks.Task.Delay(500);
             string clipboardContent = GUIUtility.systemCopyBuffer;
-            _listItems.Last().SetURL(clipboardContent);
+            InstantiateListItemWithText(clipboardContent);
         }
 
         private void InstantiateListItem()
+        {
+            InstantiateListItemWithText();
+        }
+        
+        private void InstantiateListItemWithText(string initialText = null)
         {
             var go = Instantiate(_itemViewPrefab, transform, true);
             go.transform.localScale = Vector3.one;
             go.RegisterOnRemove(RemoveItemFromList);
             go.RegisterOnProcess(OnProcessClicked);
+            go.RegisterOnVideo(OnVideoClicked);
             go.SetLoadingAnimationManager(_loadingAnimationManager);
+            YouTubeURLListItemView.EntryTypeImageYouTube = _entryTypeSpriteYouTube;
+            YouTubeURLListItemView.EntryTypeImageSmule = _entryTypeSpriteSmule;
             _addItemButton.transform.parent.SetAsLastSibling();
+
+            if (initialText != null)
+            {
+                go.SetURL(initialText);
+            }
+            
             _listItems.Add(go);
         }
 
         private void OnProcessClicked(YouTubeURLListItemView itemClicked, string arg1)
         {
             LockListItemsExcept(itemClicked, true);
+        }
+
+        private void OnVideoClicked(SongMetadata itemClickedMetadata)
+        {
+            _lyricsSyncPanel.gameObject.SetActive(true);
+            _lyricsSyncPanel.Init(itemClickedMetadata);
         }
 
         public void LockListItemsExcept(YouTubeURLListItemView itemNotToLock, bool shouldLock)

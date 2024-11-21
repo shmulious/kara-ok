@@ -93,6 +93,13 @@ public class MainSceneView : MonoBehaviour
         }
     }
 
+    private void OnApplicationQuit()
+    {
+        SmuleService.Dispose();
+        SmuleDownloader.Dispose();
+        PythonRunner.Dispose();
+    }
+
     private async Task ProcessList()
     {
         Debug.Log("[MainSceneView] - ProcessList method started");

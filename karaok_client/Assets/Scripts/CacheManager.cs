@@ -30,6 +30,15 @@ public class CacheManager
         return SongMetadata.FromJson(Cache[uRL]);
     }
 
+    public static async void UpdateCachedFiles(string url)
+    {
+        if (Cache.ContainsKey(url))
+        {
+            var metadata = await LoadMetadata(url);
+            metadata.TryGetCachedSongFiles();
+        }
+    }
+
     private static async Task<SongMetadata> FetchMetadata(string url)
     {
         var pythonRunner = new PythonRunner();

@@ -50,7 +50,7 @@ namespace DataClasses
             TryGetCachedSongFiles();
         }
 
-        private void TryGetCachedSongFiles()
+        public void TryGetCachedSongFiles()
         {
             if (Directory.Exists(CachePath))
             {
@@ -115,13 +115,12 @@ namespace DataClasses
         {
             var lyricsFilePath = await CacheManager.WriteFileAsync(Lyrics, Path.Combine(CachePath, "lyrics.txt"));
             CachedSongFile f = new CachedSongFile(lyricsFilePath, CachedSongFile.FileType.Text);
-            CachedFiles[CachedSongFiles.LyricsKey] = f;
+            CachedFiles[CachedSongFiles.FileKey.Lyrics] = f;
         }
 
         private void PrepareThumbnailDatasForSerialization()
         {
             int index = 0;
-            CachedFiles = new CachedSongFiles();
             foreach (var item in ThumbnailDatas)
             {
                 item.PrepareForSerialization(CachePath, index);

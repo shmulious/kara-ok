@@ -10,6 +10,7 @@ using UnityEngine;
 public class SmuleDownloader
 {
     private readonly string nodePath;
+    private static List<Process> _processes = new List<Process>();
 
     public SmuleDownloader(string nodePath)
     {
@@ -37,7 +38,7 @@ public class SmuleDownloader
     {
         string scriptPath = Path.Combine(Application.streamingAssetsPath, PythonRunner.PYTHON_SCRIPTS_ROOT, "nodejs", "getMediaUrl.js");
 
-        var process = new Process
+       var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
@@ -74,7 +75,7 @@ public class SmuleDownloader
                     KaraokLogger.LogError($"[{process.StartInfo.FileName} - {process.StartInfo.Arguments}]\nError: {args.Data}");
                 }
             };
-
+            _processes.Add(process);
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
@@ -96,6 +97,14 @@ public class SmuleDownloader
         {
             KaraokLogger.LogError($"[{process.StartInfo.FileName} - {process.StartInfo.Arguments}]\n exception running script: {ex.Message}");
             return default;
+        }
+        finally
+        {
+            _processes.Remove(process);
+            if (!process.HasExited)
+            {
+                process.Kill();
+            }
         }
     }
 
@@ -138,6 +147,7 @@ public class SmuleDownloader
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        
         var process = new Process() { StartInfo = startInfo };
         // Start the process
         string output = string.Empty;
@@ -161,7 +171,8 @@ public class SmuleDownloader
                     KaraokLogger.LogError($"[{process.StartInfo.FileName} - {process.StartInfo.Arguments}]\nError: {args.Data}");
                 }
             };
-
+            
+            _processes.Add(process);
             process.Start();
 
             // Begin reading the output and error streams asynchronously
@@ -181,6 +192,22 @@ public class SmuleDownloader
         {
             KaraokLogger.LogError($"[{process.StartInfo.FileName} - {process.StartInfo.Arguments}]\n error running Python script: {ex.Message}");
             return null;
+        }
+        finally
+        {
+            _processes.Remove(process);
+            if (!process.HasExited)
+            {
+                process.Kill();
+            }
+        }
+    }
+    
+    public static void Dispose()
+    {
+        foreach (var process in _processes)
+        {
+            process.Kill();
         }
     }
 }

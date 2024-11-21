@@ -4,6 +4,8 @@ using UnityEngine.Networking;
 using HtmlAgilityPack;
 using Newtonsoft.Json.Linq;
 using System.Linq;
+using System.Text;
+using System.Web;
 using System.Xml;
 
 public class GeniusProvider : ILyricsProvider
@@ -84,6 +86,7 @@ public class GeniusProvider : ILyricsProvider
     }
 
     // Scrape the lyrics from the Genius page
+// Find elements with attributes like this: data-lyrics-container
     private async Task<string> ScrapeLyricsFromGeniusPage(string lyricsUrl)
     {
         using (UnityWebRequest webRequest = UnityWebRequest.Get(lyricsUrl))
@@ -102,14 +105,20 @@ public class GeniusProvider : ILyricsProvider
             var htmlDoc = new HtmlDocument();
             htmlDoc.LoadHtml(webRequest.downloadHandler.text);
 
-            // Find the lyrics element - Genius typically wraps lyrics in a <div> with the class "lyrics" or "Lyrics__Container"
-            var lyricsDiv = htmlDoc.DocumentNode.SelectSingleNode("//div[contains(@class, 'Lyrics__Container')]");
+            // Find all elements with the "data-lyrics-container" attribute
+            var lyricsNodes = htmlDoc.DocumentNode.SelectNodes("//*[@data-lyrics-container]");
 
-            if (lyricsDiv != null)
+            if (lyricsNodes != null && lyricsNodes.Count > 0)
             {
-                // Extract the inner text (lyrics) and return it
-                string lyrics = StringCleaner.ConvertHtmlToPlainText(lyricsDiv.InnerHtml);
-                return lyrics.Trim();  // Return the cleaned lyrics
+                // Concatenate the inner texts of all matched elements
+                StringBuilder lyricsBuilder = new StringBuilder();
+                foreach (var node in lyricsNodes)
+                {
+                    lyricsBuilder.AppendLine(StringCleaner.ConvertHtmlToPlainText(node.InnerHtml));
+                    lyricsBuilder.AppendLine("\n");
+                }
+
+                return HttpUtility.HtmlDecode(lyricsBuilder.ToString().Trim()); // Return the cleaned and concatenated lyrics
             }
 
             Debug.LogError("Failed to scrape lyrics from Genius page.");

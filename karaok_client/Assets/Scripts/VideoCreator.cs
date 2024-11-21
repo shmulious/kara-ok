@@ -13,9 +13,9 @@ public class VideoCreator
         string pythonExePath = Path.Combine(ProcessRunnerBase.ENV_PATH, "venvs", "vosk-env", "bin/python3");
         string scriptPath = Path.Combine(Application.streamingAssetsPath, PythonRunner.PYTHON_SCRIPTS_ROOT, "main/vosk_service.py");
 
-        var vocalTrackPath = metadata.CachedFiles[CachedSongFiles.VocalsKey].LocalPath;
-        var lyricsFilePath = metadata.CachedFiles[CachedSongFiles.LyricsKey].LocalPath;
-        var instrumentalTrackPath = metadata.CachedFiles[CachedSongFiles.NoVocalsKey].LocalPath;
+        var vocalTrackPath = metadata.CachedFiles[CachedSongFiles.FileKey.Vocals].LocalPath;
+        var lyricsFilePath = metadata.CachedFiles[CachedSongFiles.FileKey.Lyrics].LocalPath;
+        var instrumentalTrackPath = metadata.CachedFiles[CachedSongFiles.FileKey.NoVocals].LocalPath;
         var baseName = Path.Combine(metadata.CachePath, "video", $"{metadata.Artist} - {metadata.Title}"); 
         var outputSrtPath = Path.Combine(baseName, ".srt");
         var outputVideoPath = Path.Combine(baseName, ".mp4");
